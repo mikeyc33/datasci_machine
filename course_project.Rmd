@@ -1,0 +1,26 @@
+---
+title: "Coursera Machine Learning Course Project"
+---
+
+This document describes the methods used to build a pedictive model to predict the manner in which participants exercise. Using the training dataset provided, we will select appropriate predictors for our outcome variable of interest - "classe"
+```{r echo=FALSE}
+library(dplyr)
+```
+The first step is to read in our training dataset, which is shown below
+
+```{r}
+train_df1 <- read.csv("./machine_learn/data/pml-training.csv", stringsAsFactors=F)
+```
+
+To save space, we don't print out the first 10 rows from the training set. However, if we did print out the first 10 records from the training set, we would see there are quite a few variables we can use to build a predictive model. Some of the variables appear to have NAs for the majority of recods. To limit the number of predictors, we'll keep only variables that contain >= 50% non-missing values across all records. The code below will subset only columns that contain less than 50% missing values, and return it as a new data frame.
+
+```{r}
+NA_count <- as.numeric(sapply(train_df1, function(x) sum(is.na(x))))
+
+train_df2 <- train_df1[,NA_count < nrow(train_df1)/2] %>%
+             select(-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, 
+                       new_window, num_window))
+```
+
+After dropping variables which contain >=50% NA for all records and administrative variables (i.e. timestamp variables),
+we're still left with over eighty predictors. This is a situation where principal component analysis is a good option to build a predictive model.
