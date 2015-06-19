@@ -2,25 +2,55 @@
 title: "Coursera Machine Learning Course Project"
 ---
 
-This document describes the methods used to build a pedictive model to predict the manner in which participants exercise. Using the training dataset provided, we will select appropriate predictors for our outcome variable of interest - "classe"
-```{r echo=FALSE}
-library(dplyr)
+This document describes the methods used to build a pedictive model to predict the manner in which participants exercise. Using the training dataset provided, we will build a model to predict our outcome variable of interest - "classe".
+
+```{r, echo=FALSE}
+library(caret)
+library(randomForest)
 ```
-The first step is to read in our training dataset, which is shown below
+
+The first step is to read in our training dataset, which is shown below.
 
 ```{r}
-train_df1 <- read.csv("./machine_learn/data/pml-training.csv", stringsAsFactors=F)
+train_df1 <- read.csv("./data/pml-training.csv", stringsAsFactors=F, na.strings=c("NA",""))
 ```
 
-To save space, we don't print out the first 10 rows from the training set. However, if we did print out the first 10 records from the training set, we would see there are quite a few variables we can use to build a predictive model. Some of the variables appear to have NAs for the majority of recods. To limit the number of predictors, we'll keep only variables that contain >= 50% non-missing values across all records. The code below will subset only columns that contain less than 50% missing values, and return it as a new data frame.
+To save space, we won't print out the first 10 records from the training set. However, if we did print out the first 10 records from the training set, we would see there are 160 variables in the dataset. Some of these variables appear to have NAs for the majority of records. To limit the number of predictors, we'll keep only variables that contain >= 50% non-missing values across all records. In addition, we'll also drop administrative variables that are not useful for the model (i.e. timestamp variables). The code below will select the appropriate variables and create a new data frame.
 
 ```{r}
 NA_count <- as.numeric(sapply(train_df1, function(x) sum(is.na(x))))
 
-train_df2 <- train_df1[,NA_count < nrow(train_df1)/2] %>%
-             select(-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, 
-                       new_window, num_window))
+#drop variables with >= 50% missing values for all rows
+train_df2 <- train_df1[,NA_count < nrow(train_df1)/2] 
+
+#drop administrative time stamp variables
+train_df2 <- subset(train_df2, select=-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp,new_window, num_window))
+
+train_df2$classe <- as.factor(train_df2$classe)
 ```
 
-After dropping variables which contain >=50% NA for all records and administrative variables (i.e. timestamp variables),
-we're still left with over eighty predictors. This is a situation where principal component analysis is a good option to build a predictive model.
+After subsetting appropriate variables, we're left with approximately 50 predictors. Before we build our model, we'll divide the training dataset into 2 additional datasets. The first dataset will contain 60% of the records from the data frame "train_df2", and will be used to train our model. The second dataset will contain the remaining 40% of the records from the data frame "train_df2", and will be used to estimate the out of sample error rate.
+
+```{r}
+build_records <- createDataPartition(y=train_df2$classe, p=0.6, list=F)
+
+train_df3 <- train_df2[build_records,]
+
+error_df <- train_df2[-build_records,]
+```
+
+Using the dataset "train_df3", let's build a predictive model using a "random forest" algorithm. In order to balance performance time and accuracy, it was decided to set the final algorithm with 1000 trees.
+
+```{r}
+set.seed(123)
+forest <- randomForest(classe ~ ., data=train_df3, ntree=1000, importance=T)
+forest
+```
+
+Using our model above, we'll calculate the accuracy and estimate the out of sample error rate using the records we set aside in the error_df dataset. To do this, we'll use the "confusionMatrix" functon.
+
+```{r}
+confusionMatrix(predict(forest, newdata=error_df[,-53]), error_df$classe)
+```
+
+From the output above, we see the accuracy of our model is 99.4%, and the out of sample error rate = 0.6%.
